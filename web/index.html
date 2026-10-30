@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhonePe Transaction Insights</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+:root{--ink:#1B1630;--mute:#6B6584;--paper:#F6F4FA;--card:#fff;--line:#E2DDEE;--violet:#5F259F;--saffron:#E8A33D;--red:#C8453B}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 15px/1.55 "Public Sans",system-ui,sans-serif}
+h1,h2,h3,.num{font-family:Fraunces,Georgia,serif;font-weight:700;letter-spacing:-.01em}
+header{padding:28px 5vw 8px}
+h1{font-size:clamp(26px,4vw,40px);margin:0 0 4px}
+header p{margin:0;color:var(--mute);max-width:62ch}
+main{padding:0 5vw 60px}
+.controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:18px 0}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:none;padding:8px 13px;font:500 13px "Public Sans";color:var(--mute);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--violet);color:#fff}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--saffron);outline-offset:2px}
+.play{border:1px solid var(--violet);color:var(--violet);background:var(--card);border-radius:8px;padding:8px 14px;font:600 13px "Public Sans";cursor:pointer;min-width:86px}
+.slider{flex:1;min-width:220px;display:flex;align-items:center;gap:12px}
+.slider input{flex:1;accent-color:var(--violet)}
+.period{font:700 22px Fraunces,serif;min-width:96px;text-align:right}
+.hero{display:grid;grid-template-columns:3fr 2fr;gap:20px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.panel h2{font-size:18px;margin:0 0 2px}.panel .sub{color:var(--mute);font-size:13px;margin:0 0 6px}
+#map{height:560px}#top{height:520px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
+section{margin-top:34px}section>h2{font-size:24px;margin:0 0 4px}section>.lead{color:var(--mute);margin:0 0 14px;max-width:70ch}
+.drill{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);font:500 14px "Public Sans";color:var(--ink)}
+.finds{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.find{background:var(--card);border-left:4px solid var(--violet);border-radius:6px;padding:12px 14px}
+.find.warn{border-color:var(--red)}.find.gold{border-color:var(--saffron)}
+.find .num{font-size:28px;line-height:1.1;display:block;margin-bottom:4px}
+.find p{margin:0;font-size:14px}
+footer{padding:24px 5vw;color:var(--mute);font-size:13px;border-top:1px solid var(--line)}
+@media(max-width:900px){.hero,.grid2{grid-template-columns:1fr}#map{height:420px}#top{height:420px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>How India learned to pay on PhonePe</h1>
+  <p>Transactions, value, users and merchants for 36 states and UTs, from Q1 2018 to the latest quarter. Press play to watch adoption spread.</p>
+</header>
+<main>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Metric" id="metrics"></div>
+    <button class="play" id="play" aria-label="Play timeline">Play</button>
+    <div class="slider"><input type="range" id="slide" min="0" value="0" aria-label="Quarter"><span class="period" id="period"></span></div>
+  </div>
+  <div class="hero">
+    <div class="panel"><h2 id="mapTitle"></h2><p class="sub">Darker means higher (log scale). Click a state to drill down.</p><div id="map"></div></div>
+    <div class="panel"><h2>Top 10 states</h2><p class="sub" id="topSub"></p><div id="top"></div></div>
+  </div>
+
+  <section>
+    <h2>Growth and mix</h2>
+    <p class="lead">Quarterly volume keeps climbing, and retail purchases now outnumber person-to-person transfers.</p>
+    <div class="grid2">
+      <div class="panel"><h3>National transactions and value</h3><div id="trend" style="height:340px"></div></div>
+      <div class="panel"><h3>Transactions by payment category</h3><div id="cats" style="height:340px"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>State drill-down</h2>
+    <p class="lead">Pick a state to see its quarterly trend and its busiest districts in the selected year.</p>
+    <div class="drill"><label for="state">State</label><select id="state"></select></div>
+    <div class="grid2">
+      <div class="panel"><h3 id="stTitle"></h3><div id="stTrend" style="height:340px"></div></div>
+      <div class="panel"><h3 id="dTitle"></h3><div id="dist" style="height:340px"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What the data says</h2>
+    <p class="lead">Findings computed live from the SQL query results in <code>data/</code>.</p>
+    <div class="finds" id="finds"></div>
+  </section>
+</main>
+<footer>Source: PhonePe Pulse open data (github.com/PhonePe/pulse). Amounts are in rupees; 1 crore = 10 million. Anomaly flags are screening signals, not proof of fraud.</footer>
+
+<script>
+const V='#5F259F', S='#E8A33D', R='#C8453B', INK='#1B1630', L='#E2DDEE';
+const cfg={displayModeBar:false,responsive:true}, lay=(o={})=>Object.assign({margin:{l:50,r:20,t:10,b:40},paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{family:'Public Sans',color:INK,size:12}},o);
+const nf=new Intl.NumberFormat('en-IN',{maximumFractionDigits:1});
+const big=v=>v>=1e9?nf.format(v/1e9)+' B':v>=1e6?nf.format(v/1e6)+' M':v>=1e3?nf.format(v/1e3)+' K':nf.format(v);
+const METRICS={
+  txns:{label:'Transactions',f:r=>r.txns,fmt:big},
+  amount:{label:'Value (₹ crore)',f:r=>r.amount_cr,fmt:v=>'₹'+nf.format(v)+' cr'},
+  users:{label:'Registered users',f:r=>r.users,fmt:big},
+  merchants:{label:'Registered merchants',f:r=>r.merchants,fmt:big},
+  ticket:{label:'Average ticket (₹)',f:r=>r.txns?r.amount_cr*1e7/r.txns:null,fmt:v=>'₹'+nf.format(v)},
+  peruser:{label:'Transactions per user',f:r=>r.users?r.txns/r.users:null,fmt:v=>nf.format(v)}
+};
+let D={}, geo, periods=[], idx=0, metric='txns', state='Maharashtra', timer=null;
+const get=n=>fetch(`data/${n}.json`).then(r=>r.json());
+const pl=p=>`Q${p%10} ${Math.floor(p/10)}`;
+const key=r=>r.year*10+r.quarter;
+
+async function init(){
+  const names=['q16_state_period_metrics','q17_district_yearly','q05_quarterly_trend_qoq','q01_yearly_category_growth','q09_state_cagr_2022_2025','q06_engagement_by_state_latest','q07_district_segments_2025','q08_ticket_size_anomalies','q12_merchant_penetration_latest'];
+  try{
+    const [res,g]=await Promise.all([Promise.all(names.map(get)),fetch('data/india_states.geojson').then(r=>r.json())]);
+    names.forEach((n,i)=>D[n.split('_')[0].replace('q0','q')]=res[i]); geo=g;
+  }catch(e){document.querySelector('main').innerHTML='<p>Could not load data files. Check that the data/ folder is deployed.</p>';return}
+  periods=[...new Set(D.q16.map(key))].sort(); idx=periods.length-1;
+  const sl=document.getElementById('slide'); sl.max=periods.length-1; sl.value=idx;
+  sl.oninput=()=>{idx=+sl.value;draw()};
+  const m=document.getElementById('metrics');
+  Object.entries(METRICS).forEach(([k,v])=>{const b=document.createElement('button');b.textContent=v.label;b.setAttribute('aria-pressed',k===metric);b.onclick=()=>{metric=k;[...m.children].forEach(c=>c.setAttribute('aria-pressed',c===b));draw()};m.appendChild(b)});
+  document.getElementById('play').onclick=toggle;
+  const sel=document.getElementById('state'); [...new Set(D.q16.map(r=>r.state))].sort().forEach(s=>sel.add(new Option(s,s))); sel.value=state;
+  sel.onchange=()=>{state=sel.value;drawDrill()};
+  drawStatic(); draw(); findings();
+}
+function toggle(){
+  const b=document.getElementById('play');
+  if(timer){clearInterval(timer);timer=null;b.textContent='Play';return}
+  if(idx>=periods.length-1) idx=0;
+  b.textContent='Pause';
+  timer=setInterval(()=>{ if(idx>=periods.length-1){toggle();return} idx++;document.getElementById('slide').value=idx;draw()},500);
+}
+function rows(){return D.q16.filter(r=>key(r)===periods[idx])}
+function draw(){
+  const M=METRICS[metric], p=periods[idx], data=rows().map(r=>({s:r.state,v:M.f(r)})).filter(d=>d.v!=null&&d.v>0);
+  document.getElementById('period').textContent=pl(p);
+  document.getElementById('mapTitle').textContent=M.label+', '+pl(p);
+  document.getElementById('topSub').textContent=M.label+' in '+pl(p);
+  Plotly.react('map',[{type:'choropleth',geojson:geo,featureidkey:'properties.state',locations:data.map(d=>d.s),z:data.map(d=>Math.log10(d.v)),
+    text:data.map(d=>`<b>${d.s}</b><br>${M.fmt(d.v)}`),hoverinfo:'text',showscale:false,
+    colorscale:[[0,'#EFE9F8'],[.5,'#9B6BD0'],[1,'#2E0F5C']],marker:{line:{color:'#fff',width:.6}}}],
+    lay({margin:{l:0,r:0,t:0,b:0},geo:{fitbounds:'locations',visible:false,bgcolor:'rgba(0,0,0,0)'}}),cfg).then(g=>{g.removeAllListeners&&g.removeAllListeners('plotly_click');g.on('plotly_click',e=>{state=e.points[0].location;document.getElementById('state').value=state;drawDrill()})});
+  const top=[...data].sort((a,b)=>b.v-a.v).slice(0,10).reverse();
+  Plotly.react('top',[{type:'bar',orientation:'h',x:top.map(d=>d.v),y:top.map(d=>d.s),text:top.map(d=>M.fmt(d.v)),textposition:'outside',cliponaxis:false,marker:{color:V},hoverinfo:'skip'}],
+    lay({margin:{l:130,r:70,t:6,b:30},xaxis:{showgrid:false,showticklabels:false},yaxis:{automargin:true}}),cfg);
+  drawTrendMarker(); drawDrill();
+}
+function drawStatic(){
+  const t=D.q5, x=t.map(r=>`Q${r.quarter} ${r.year}`);
+  window._trendX=x;
+  Plotly.newPlot('trend',[
+    {type:'bar',x,y:t.map(r=>r.txns),name:'Transactions',marker:{color:V},yaxis:'y'},
+    {type:'scatter',mode:'lines',x,y:t.map(r=>r.amount_cr),name:'Value (₹ cr)',line:{color:S,width:3},yaxis:'y2'}],
+    lay({margin:{l:60,r:60,t:10,b:60},legend:{orientation:'h',y:1.12},xaxis:{tickangle:-60,nticks:12},yaxis:{tickformat:'.2s',gridcolor:L},yaxis2:{overlaying:'y',side:'right',tickformat:'.2s',showgrid:false},shapes:[]}),cfg);
+  const cats=['P2P','Retail','Utility'], col={P2P:'#9B6BD0',Retail:V,Utility:S};
+  Plotly.newPlot('cats',cats.map(c=>{const r=D.q1.filter(d=>d.payment_category===c);return{type:'bar',name:c,x:r.map(d=>d.year),y:r.map(d=>d.txns),marker:{color:col[c]}}}),
+    lay({barmode:'stack',legend:{orientation:'h',y:1.12},yaxis:{tickformat:'.2s',gridcolor:L},xaxis:{dtick:1}}),cfg);
+}
+function drawTrendMarker(){
+  const x=window._trendX[D.q5.findIndex(r=>key(r)===periods[idx])];
+  if(x) Plotly.relayout('trend',{shapes:[{type:'line',xref:'x',yref:'paper',x0:x,x1:x,y0:0,y1:1,line:{color:R,width:2,dash:'dot'}}]});
+}
+function drawDrill(){
+  const sr=D.q16.filter(r=>r.state===state), M=METRICS[metric], yr=Math.floor(periods[idx]/10);
+  document.getElementById('stTitle').textContent=state+': '+M.label;
+  Plotly.react('stTrend',[{type:'scatter',mode:'lines+markers',x:sr.map(r=>`Q${r.quarter} ${r.year}`),y:sr.map(M.f),line:{color:V,width:3},marker:{size:4}}],lay({xaxis:{tickangle:-60,nticks:10},yaxis:{gridcolor:L,tickformat:metric==='ticket'||metric==='peruser'?'':'.2s'}}),cfg);
+  const dr=D.q17.filter(r=>r.state===state&&r.year===yr).sort((a,b)=>b.txns-a.txns).slice(0,12).reverse();
+  document.getElementById('dTitle').textContent='Busiest districts in '+state+', '+yr;
+  Plotly.react('dist',[{type:'bar',orientation:'h',x:dr.map(r=>r.txns),y:dr.map(r=>r.district),text:dr.map(r=>big(r.txns)),textposition:'outside',cliponaxis:false,marker:{color:S},hoverinfo:'skip'}],
+    lay({margin:{l:140,r:70,t:6,b:30},xaxis:{showgrid:false,showticklabels:false},yaxis:{automargin:true}}),cfg);
+}
+function findings(){
+  const e=D.q6, c=D.q9, sg=D.q7, an=D.q8, mp=D.q12, el=document.getElementById('finds');
+  const hi=e[0], lo=e[e.length-1], g1=c[0];
+  const ev=sg.find(s=>s.segment.startsWith('Everyday')), nr=sg.find(s=>s.segment.startsWith('Emerging'));
+  const bigFast=[...c].filter(r=>r.txns_2025>1e9).sort((a,b)=>b.cagr_pct-a.cagr_pct)[0];
+  const kl=c.find(r=>r.state==='Kerala');
+  const card=(cls,n,t)=>`<div class="find ${cls}"><span class="num">${n}</span><p>${t}</p></div>`;
+  el.innerHTML=[
+    card('',`${nf.format(hi.txns_per_user/lo.txns_per_user)}x`,`Engagement gap: ${hi.state} makes ${nf.format(hi.txns_per_user)} transactions per registered user, ${lo.state} only ${nf.format(lo.txns_per_user)}.`),
+    card('gold',`+${g1.cagr_pct}%`,`Fastest 3-year growth (2022 to 2025): ${g1.state}. Among large states (over 1B transactions) it is ${bigFast.state} at +${bigFast.cagr_pct}% a year.`),
+    card('warn',`+${kl.cagr_pct}%`,`Kerala grows slowest of all 36 (${kl.cagr_pct}% a year) and ranks near the bottom on engagement. Worth investigating: competing apps, or low activity per user.`),
+    card('',`${ev.value_share_pct}%`,`of 2025 value comes from ${ev.districts} "everyday spender" districts: frequent, low-ticket payments.`),
+    card('gold',`${nr.districts}`,`districts are under-engaged: ${nf.format(nr.users_mn)} M registered users but only ${nf.format(nr.avg_txns_per_user)} transactions per user a year.`),
+    card('warn',`${an.length}`,`district-quarters show average tickets more than 3 standard deviations above normal. Top flag: ${an[0].district} (${an[0].state}). Review, do not assume fraud.`),
+    card('',nf.format(mp[0].merchants_per_1k_users),`merchants per 1,000 users in ${mp[0].state}, the densest merchant network; ${mp[mp.length-1].state} has ${nf.format(mp[mp.length-1].merchants_per_1k_users)}.`)
+  ].join('');
+}
+init();
+</script>
+</body>
+</html>
